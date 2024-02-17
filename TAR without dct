@@ -1,0 +1,55 @@
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.api import VAR
+from sklearn.metrics import mean_absolute_error
+
+# Read the Excel file
+excel_file_path = r"C:\Users\DESUCCESS COMPUTER\Documents\tnsr.xlsx"
+excel_data = pd.ExcelFile(excel_file_path)
+
+# Create an empty dictionary to store DataFrames
+dataframes = {}
+
+# Read data from each sheet into separate DataFrames
+for sheet_name in excel_data.sheet_names:
+    dataframes[sheet_name] = pd.read_excel(excel_data, sheet_name=sheet_name)
+
+# Initialize an empty array to store the transformed data
+h = 200  # Prediction horizon
+Z = np.zeros((6, h, 5))
+mae_scores = []
+
+# Process each sheet
+for i, sheet_name in enumerate(excel_data.sheet_names):
+    X = dataframes[sheet_name]
+    X_train = X.iloc[:1800, :]  # First 1800 observations for training
+    X_test = X.iloc[1800:, :]    # Last 200 observations for testing
+    
+    # Fit VAR model
+    model = VAR(X_train)
+    results = model.fit(2)
+    lag_order = results.k_ar
+    
+    # Forecast
+    y_pred = results.forecast(X_train.values[-lag_order:], steps=h)
+    
+    # Apply inverse DCT to get the forecasted data back to original space
+    predicted_values = y_pred
+    
+    # Extract test values
+    test_values = X_test.to_numpy()
+    
+    # Compute Mean Absolute Error (MAE)
+    mae = mean_absolute_error(test_values[:h, :], predicted_values)
+    mae_scores.append(mae)
+    
+    # Store forecasted values in Z array
+    Z[i, :, :] = predicted_values
+    
+    print(f"Sheet {i+1} - MAE: {mae}")
+
+# Print the mean MAE score across all sheets
+print(f"Mean MAE: {np.mean(mae_scores)}")
+
+# Print the resulting Z array
+#print(Z)
